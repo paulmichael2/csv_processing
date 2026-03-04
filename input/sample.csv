@@ -7,12 +7,12 @@ id,name,email,age,salary,join_date,department!!!
 1,  John Doe  ,john.doe@email.com,28,50000,01/15/2023,Engineering
 6,David@Lee#,david.lee@email.com,31,58000,2023-06-20,!!!!!!Engineering
 7,Eva Martinez,eva.m@email.com,27,52000,,Sales
-8,Frank$White,frank.white@email.com,33,62000,07/30/2023,Marketing
-9,Grace Kim,grace.kim@email.com,30,57000,2023-08-15,Engineering
+8,Frank$White,frank.white@email.com!!!!!!!!!,33,62000,07/30/2023,Marketing
+9,Grace Kim,grace.kim!!!!@email.com,30,57000,2023-08-15,Engineering
 10,Henry%Brown,henry.b@email.com,,54000,09/01/2023,Sales
 3,  Bob Johnson,bob.johnson@email.com!!!!!!!!!!!,,55000,03-25-2023,Engineering
 11,  Ivy Chen^ ,ivy.chen@email.com,26,48000,2023-10-05,Engineering
 12,Jack&Williams,jack.w@email.com,34,,11/20/2023,Marketing
-13,Kate*Lee,kate.lee@email.com,29,56000,2023-12-01,Sales
-14,  Leo Garcia  ,leo.g@email.com,31,59000,,Engineering
+13,Kate*Lee,kate.lee@email.com!!!!!!!!!!!!!!!!!!!,29,56000,2023-12-01,Sales
+14,  Leo Garcia!,leo.g@email.com,31,59000,,Engineering
 15,Mia!Rodriguez,mia.r@email.com,28,53000,2024-01-15,Sales

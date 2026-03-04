@@ -35,7 +35,6 @@ jobs:
       run: |
         mkdir -p input output
         rm -f output/*.csv
-        echo "✓ Directories ready"
 
     - name: Run PyTest
       run: |
@@ -49,16 +48,11 @@ jobs:
       run: |
         echo "=== Output Files ==="
         ls -la output/
-        
-        # Check if ANY processed CSV files exist (flexible check)
-        PROCESSED_FILES=$(find output/ -name "processed_*.csv" -type f | wc -l)
-        
-        if [ "$PROCESSED_FILES" -gt 0 ]; then
-          echo "✓ Found $PROCESSED_FILES processed CSV file(s):"
-          find output/ -name "processed_*.csv" -type f
-          echo "✓ Processing successful!"
+        PROCESSED=$(find output/ -name "processed_*.csv" -type f | wc -l)
+        if [ "$PROCESSED" -gt 0 ]; then
+          echo "✓ Found $PROCESSED processed file(s)"
         else
-          echo "❌ No processed CSV files found in output/"
+          echo "❌ No processed files found"
           exit 1
         fi
 
