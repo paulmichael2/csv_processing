@@ -1,0 +1,17 @@
+id,name,email,age,salary,join_date,department
+1,John Doe,john.doe@email.com,28.0,50000.0,2023-01-15,Engineering
+2,Jane Smith,jane.smith@email.com,32.0,60000.0,,Marketing
+3,Bob Johnson,bob.johnson@email.com,30.23076923076923,55000.0,,Engineering
+4,Alice Brown,alice.brown@email.com,29.0,56357.142857142855,,Sales
+5,Charlie Wilson,charlie.w@email.com,35.0,70000.0,2023-05-15,Marketing
+6,David@Lee,david.lee@email.com,31.0,58000.0,,Engineering
+7,Eva Martinez,eva.m@email.com,27.0,52000.0,,Sales
+8,FrankWhite,frank.white@email.com,33.0,62000.0,2023-07-30,Marketing
+9,Grace Kim,grace.kim@email.com,30.0,57000.0,,Engineering
+10,HenryBrown,henry.b@email.com,30.23076923076923,54000.0,2023-09-01,Sales
+3,Bob Johnson,bob.johnson@email.com,30.23076923076923,55000.0,,Engineering
+11,Ivy Chen,ivy.chen@email.com,26.0,48000.0,,Engineering
+12,JackWilliams,jack.w@email.com,34.0,56357.142857142855,2023-11-20,Marketing
+13,KateLee,kate.lee@email.com,29.0,56000.0,,Sales
+14,Leo Garcia,leo.g@email.com,31.0,59000.0,,Engineering
+15,MiaRodriguez,mia.r@email.com,28.0,53000.0,,Sales
