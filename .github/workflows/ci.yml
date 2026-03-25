@@ -1,6 +1,6 @@
 name: CSV Processing CI
 
-# Grant write permissions for auto-commit
+# 🔑 Grant write permissions for auto-commit
 permissions:
   contents: write
 
@@ -12,88 +12,111 @@ on:
 
 # Environment variables for consistent logging
 env:
-  PYTHONUNBUFFERED: "1"  # Force Python to flush output immediately
+  PYTHONUNBUFFERED: "1"  # Force immediate output flushing
   PYTEST_ADDOPTS: "-v --tb=short"  # Verbose pytest with short tracebacks
 
 jobs:
   build-and-process:
     runs-on: ubuntu-latest
-    
-    # Add timeout to prevent hung jobs
-    timeout-minutes: 15
+    timeout-minutes: 15  # Prevent hung jobs
 
     steps:
     # ========================================================================
-    # STEP 1: Checkout Code with Debug Info
+    # STEP 1: Checkout Code + Log Environment
     # ========================================================================
     - name: 📦 Checkout Code
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
-      
-      # Log checkout details
-      - name: 📋 Log Checkout Info
-        run: |
-          echo "🔍 Checkout completed"
-          echo "📁 Repository: ${{ github.repository }}"
-          echo "🔖 Ref: ${{ github.ref }}"
-          echo "📝 Commit: ${{ github.sha }}"
-          echo "👤 Actor: ${{ github.actor }}"
-          echo "🔀 Event: ${{ github.event_name }}"
-          echo "📂 Workspace: $GITHUB_WORKSPACE"
-          ls -la
+
+    - name: 📋 Log Build Context
+      run: |
+        echo "🔍 ============================================"
+        echo "🔍 CSV Processing CI - Build Started"
+        echo "🔍 ============================================"
+        echo "📁 Repository: ${{ github.repository }}"
+        echo "🔖 Branch: ${{ github.ref }}"
+        echo "📝 Commit: ${{ github.sha }}"
+        echo "👤 Triggered by: ${{ github.actor }}"
+        echo "🔀 Event: ${{ github.event_name }}"
+        echo "🕐 Time: $(date)"
+        echo "📂 Workspace: $GITHUB_WORKSPACE"
+        echo ""
+        echo "📁 Project structure:"
+        ls -la
+        echo ""
+        echo "📁 functions/:"
+        ls -la functions/ 2>/dev/null || echo "  (empty or missing)"
+        echo ""
+        echo "📁 input/:"
+        ls -la input/ 2>/dev/null || echo "  (empty or missing)"
+        echo "🔍 ============================================"
 
     # ========================================================================
-    # STEP 2: Set Up Python with Version Logging
+    # STEP 2: Set Up Python + Log Version
     # ========================================================================
     - name: 🐍 Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-      
-      - name: 📋 Log Python Environment
-        run: |
-          echo "🔍 Python setup completed"
-          python --version
-          which python
-          pip --version
-          echo "📦 Python path: $(which python)"
-          echo "📦 Pip path: $(which pip)"
+
+    - name: 📋 Log Python Environment
+      run: |
+        echo "🔍 Python Environment:"
+        python --version
+        pip --version
+        echo "📍 Python path: $(which python)"
+        echo "📍 Pip path: $(which pip)"
+        echo ""
 
     # ========================================================================
-    # STEP 3: Install Dependencies with Error Handling
+    # STEP 3: Install Dependencies + Capture Errors
     # ========================================================================
     - name: 📦 Install Dependencies
       run: |
-        echo "🔍 Starting dependency installation..."
+        echo "🔍 Installing dependencies..."
+        echo "📋 requirements.txt content:"
+        cat requirements.txt
+        echo ""
+        
+        # Upgrade pip first
         python -m pip install --upgrade pip
         
-        echo "📋 Installing from requirements.txt:"
-        cat requirements.txt
-        
-        # Install with verbose output and error capture
+        # Install with verbose output + capture to log file
+        echo "📦 Running: pip install -r requirements.txt -v"
         if ! pip install -r requirements.txt -v 2>&1 | tee install.log; then
+          echo ""
+          echo "❌ ============================================"
           echo "❌ ERROR: Failed to install dependencies"
-          echo "📄 Installation log:"
+          echo "❌ ============================================"
+          echo "📄 Full install log:"
           cat install.log
+          echo ""
+          echo "💡 Common fixes:"
+          echo "   - Check requirements.txt for typos"
+          echo "   - Ensure package names are correct"
+          echo "   - Try: pip install --upgrade pip setuptools"
+          echo "❌ ============================================"
           exit 1
         fi
         
+        echo ""
         echo "✅ Dependencies installed successfully"
+        echo "📦 Installed packages:"
         pip list
-        
-      # Always run this, even if previous step fails
-      - name: 📄 Upload Install Log (if failed)
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: install-error-log
-          path: install.log
-          retention-days: 7
+        echo ""
+
+    - name: 📄 Upload Install Log (if failed)
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: install-error-log
+        path: install.log
+        retention-days: 7
 
     # ========================================================================
-    # STEP 4: Prepare Directories with Validation
+    # STEP 4: Prepare Directories + Validate Input
     # ========================================================================
     - name: 📁 Prepare Directories
       run: |
@@ -102,168 +125,250 @@ jobs:
         # Create directories
         mkdir -p input output
         
-        # Clear output folder for clean run
+        # Clear output for clean run
+        echo "🗑️  Clearing output/ folder..."
         rm -rf output/*
-        echo "🗑️  Cleared output/ folder"
         
-        # List input files
-        echo "📋 Input files:"
-        if [ -d "input" ] && [ "$(ls -A input 2>/dev/null)" ]; then
-          ls -la input/
-          echo "✅ Found $(ls input/*.csv 2>/dev/null | wc -l) CSV file(s)"
+        # Validate input folder
+        echo ""
+        echo "📋 Checking input/ folder:"
+        if [ -d "input" ]; then
+          CSV_COUNT=$(find input/ -name "*.csv" -type f | wc -l)
+          echo "✅ input/ folder exists"
+          echo "📊 Found $CSV_COUNT CSV file(s):"
+          ls -la input/*.csv 2>/dev/null || echo "  (no .csv files found)"
+          
+          if [ "$CSV_COUNT" -eq 0 ]; then
+            echo "⚠️  WARNING: No CSV files in input/"
+            echo "📝 Creating minimal sample for testing..."
+            echo "id,name,value
+1,Test,100" > input/sample.csv
+            echo "✅ Created input/sample.csv"
+          fi
         else
-          echo "⚠️  WARNING: input/ folder is empty or missing"
-          echo "📝 Creating sample data for testing..."
-          echo "id,name,email
-1,Test User,test@email.com" > input/sample.csv
+          echo "❌ ERROR: input/ folder does not exist"
+          exit 1
         fi
-        
-        # Verify directory structure
-        echo "📁 Final directory structure:"
-        find . -maxdepth 2 -type d | head -20
+        echo ""
 
     # ========================================================================
-    # STEP 5: Run PyTest with Comprehensive Error Logging
+    # STEP 5: Run PyTest + Capture Full Output
     # ========================================================================
     - name: 🧪 Run PyTest
       id: pytest
       run: |
-        echo "🔍 Starting pytest execution..."
-        echo "📋 Test command: pytest tests/ -v --tb=short"
+        echo "🔍 ============================================"
+        echo "🔍 Running PyTest"
+        echo "🔍 ============================================"
+        echo "📋 Command: pytest tests/ -v --tb=short"
+        echo ""
         
-        # Run pytest with output capture
+        # Record start time
+        start_time=$(date +%s)
+        
+        # Run pytest with output capture to log file
         if ! pytest tests/ -v --tb=short 2>&1 | tee pytest.log; then
-          echo "❌ ERROR: PyTest failed"
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          
+          echo ""
+          echo "❌ ============================================"
+          echo "❌ ERROR: PyTest failed after ${duration}s"
+          echo "❌ ============================================"
+          echo ""
           echo "📄 Full pytest output:"
           cat pytest.log
-          
-          # Extract failed test names for summary
-          echo "🔍 Failed tests summary:"
-          grep -E "(FAILED|ERROR)" pytest.log || true
-          
+          echo ""
+          echo "🔍 Failed test summary:"
+          grep -E "(FAILED|ERROR|AssertionError)" pytest.log | head -20 || true
+          echo ""
+          echo "💡 Debug tips:"
+          echo "   - Run locally: pytest tests/ -v"
+          echo "   - Check function signatures match imports"
+          echo "   - Verify test data matches expected output"
+          echo "❌ ============================================"
           exit 1
         fi
         
-        echo "✅ All tests passed"
-        # Show test summary
-        grep -E "passed|failed|error" pytest.log || true
+        end_time=$(date +%s)
+        duration=$((end_time - start_time))
         
-      # Always upload logs for debugging
-      - name: 📄 Upload PyTest Logs
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: pytest-logs-${{ github.run_number }}
-          path: |
-            pytest.log
-            .pytest_cache/
-          retention-days: 7
+        echo ""
+        echo "✅ ============================================"
+        echo "✅ PyTest passed in ${duration}s"
+        echo "✅ ============================================"
+        echo ""
+        echo "📊 Test summary:"
+        grep -E "passed|failed|error|warnings" pytest.log || true
+        echo ""
+
+    - name: 📄 Upload PyTest Logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: pytest-logs-${{ github.run_number }}
+        path: |
+          pytest.log
+          .pytest_cache/
+        retention-days: 7
 
     # ========================================================================
-    # STEP 6: Run Data Processing with Step-by-Step Logging
+    # STEP 6: Run Data Processing + Step-by-Step Logging
     # ========================================================================
     - name: ⚙️ Run Data Processing
       id: processing
       run: |
-        echo "🔍 Starting CSV processing..."
+        echo "🔍 ============================================"
+        echo "🔍 Running Data Processing (main.py)"
+        echo "🔍 ============================================"
         echo "📋 Command: python main.py"
+        echo ""
         
-        # Capture start time
+        # Record start time
         start_time=$(date +%s)
         
         # Run main.py with full output capture
         if ! python main.py 2>&1 | tee processing.log; then
-          echo "❌ ERROR: Data processing failed"
-          echo "📄 Processing log:"
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          
+          echo ""
+          echo "❌ ============================================"
+          echo "❌ ERROR: Data processing failed after ${duration}s"
+          echo "❌ ============================================"
+          echo ""
+          echo "📄 Full processing log:"
           cat processing.log
-          
-          # Show last 50 lines for quick debug
-          echo "🔍 Last 50 lines of processing.log:"
+          echo ""
+          echo "🔍 Last 50 lines (most relevant):"
           tail -50 processing.log
-          
+          echo ""
+          echo "💡 Debug tips:"
+          echo "   - Check functions/ imports match filenames"
+          echo "   - Verify CSV files are valid UTF-8"
+          echo "   - Run locally: python main.py"
+          echo "❌ ============================================"
           exit 1
         fi
         
-        # Calculate duration
         end_time=$(date +%s)
         duration=$((end_time - start_time))
-        echo "✅ Processing completed in ${duration} seconds"
         
-        # Show processing summary
-        echo "📋 Processing summary:"
-        grep -E "(✓|✅|Removed|Trimmed|Filled|Standardized|Sanitized)" processing.log || true
-        
-      # Always upload processing logs
-      - name: 📄 Upload Processing Logs
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: processing-logs-${{ github.run_number }}
-          path: |
-            processing.log
-            output/
-          retention-days: 7
+        echo ""
+        echo "✅ ============================================"
+        echo "✅ Data processing completed in ${duration}s"
+        echo "✅ ============================================"
+        echo ""
+        echo "📊 Processing summary:"
+        grep -E "(✓|✅|Removed|Trimmed|Filled|Standardized|Sanitized|Saved)" processing.log || true
+        echo ""
+
+    - name: 📄 Upload Processing Logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: processing-logs-${{ github.run_number }}
+        path: |
+          processing.log
+          output/
+        retention-days: 7
 
     # ========================================================================
-    # STEP 7: Verify Output Files with Detailed Checks
+    # STEP 7: Verify Output Files + Data Quality Checks
     # ========================================================================
     - name: ✅ Verify Output Files
       run: |
-        echo "🔍 Verifying output files..."
+        echo "🔍 ============================================"
+        echo "🔍 Verifying Output Files"
+        echo "🔍 ============================================"
+        echo ""
         
         # List output directory
         echo "📁 Output directory contents:"
         ls -la output/
+        echo ""
         
         # Count processed files
-        PROCESSED_COUNT=$(find output/ -name "processed_*.csv" -type f | wc -l)
+        PROCESSED_COUNT=$(find output/ -name "processed_*.csv" -type f 2>/dev/null | wc -l)
         echo "📊 Found $PROCESSED_COUNT processed CSV file(s)"
+        echo ""
         
         if [ "$PROCESSED_COUNT" -eq 0 ]; then
+          echo "❌ ============================================"
           echo "❌ ERROR: No processed CSV files found in output/"
-          echo "📄 Available files:"
-          find output/ -type f
+          echo "❌ ============================================"
+          echo "📄 Available files in output/:"
+          find output/ -type f 2>/dev/null || echo "  (empty)"
+          echo ""
+          echo "💡 Debug tips:"
+          echo "   - Check main.py saves to correct path"
+          echo "   - Verify input CSV files are valid"
+          echo "   - Look for errors in processing.log artifact"
+          echo "❌ ============================================"
           exit 1
         fi
         
         # Validate each processed file
+        echo "🔍 Validating each processed file:"
+        VALIDATION_ERRORS=0
+        
         for file in output/processed_*.csv; do
-          echo "🔍 Validating: $file"
+          echo ""
+          echo "📄 Checking: $file"
           
-          # Check file is not empty
+          # Check file exists and is not empty
           if [ ! -s "$file" ]; then
-            echo "❌ ERROR: $file is empty"
-            exit 1
+            echo "  ❌ ERROR: File is empty"
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            continue
           fi
+          echo "  ✅ File has content"
           
-          # Check file has header row
+          # Check header row exists
           HEADER=$(head -1 "$file")
-          echo "📋 Header: $HEADER"
+          if [ -z "$HEADER" ]; then
+            echo "  ❌ ERROR: Missing header row"
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            continue
+          fi
+          echo "  ✅ Header: $HEADER"
           
-          # Check for common data quality issues
-          echo "📊 File stats:"
-          echo "  - Lines: $(wc -l < "$file")"
-          echo "  - Columns: $(head -1 "$file" | tr ',' '\n' | wc -l)"
+          # Basic stats
+          LINE_COUNT=$(wc -l < "$file")
+          COL_COUNT=$(head -1 "$file" | tr ',' '\n' | wc -l)
+          echo "  📊 Stats: $LINE_COUNT rows, $COL_COUNT columns"
           
-          # Check for !!! (should be removed)
-          if grep -q "!!!" "$file"; then
-            echo "⚠️  WARNING: Found '!!!' in $file (may indicate sanitization issue)"
-            grep "!!!" "$file" | head -3
+          # Check for !!! (should be removed by sanitization)
+          if grep -q "!!!" "$file" 2>/dev/null; then
+            echo "  ⚠️  WARNING: Found '!!!' in file (sanitization may have issues)"
+            echo "  🔍 Lines with !!!:"
+            grep "!!!" "$file" | head -3 | sed 's/^/    /'
           else
-            echo "✅ No '!!!' found in $file"
+            echo "  ✅ No '!!!' found (sanitization working)"
           fi
           
-          # Check for @ in email columns (should be preserved)
-          if grep -qi "email" "$file"; then
-            if grep -q "@" "$file"; then
-              echo "✅ Email @ symbols preserved in $file"
+          # Check for @ in email-like columns (should be preserved)
+          if grep -qi "email" "$file" 2>/dev/null; then
+            if grep -q "@" "$file" 2>/dev/null; then
+              echo "  ✅ Email @ symbols preserved"
             else
-              echo "⚠️  WARNING: No @ symbols found - emails may be corrupted"
+              echo "  ⚠️  WARNING: No @ symbols found - emails may be corrupted"
             fi
           fi
         done
         
-        echo "✅ Output verification completed successfully"
+        echo ""
+        if [ "$VALIDATION_ERRORS" -gt 0 ]; then
+          echo "❌ ============================================"
+          echo "❌ ERROR: $VALIDATION_ERRORS file validation error(s)"
+          echo "❌ ============================================"
+          exit 1
+        fi
+        
+        echo "✅ ============================================"
+        echo "✅ All output files validated successfully"
+        echo "✅ ============================================"
+        echo ""
 
     # ========================================================================
     # STEP 8: Commit and Push Output Files (Push Events Only)
@@ -271,43 +376,59 @@ jobs:
     - name: 📤 Commit and Push Output Files
       if: github.event_name == 'push'
       run: |
-        echo "🔍 Preparing to commit output files..."
+        echo "🔍 ============================================"
+        echo "🔍 Preparing to Commit Output Files"
+        echo "🔍 ============================================"
+        echo ""
         
         # Configure Git
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         
         # Stage output files
+        echo "📦 Staging output/ folder..."
         git add output/
         
         # Check if there are changes to commit
         if git diff --staged --quiet; then
-          echo "ℹ️  No changes to commit in output/"
+          echo "ℹ️  No changes detected in output/ - nothing to commit"
         else
-          echo "📝 Changes detected in output/:"
-          git diff --staged --name-only
+          echo "📝 Changes detected:"
+          git diff --staged --name-only | sed 's/^/  - /'
+          echo ""
           
           # Commit with [skip ci] to prevent infinite loop
-          echo "📤 Committing processed files..."
-          if git commit -m "Auto-update processed CSV files [skip ci]"; then
-            echo "✅ Commit successful"
-            
-            # Push with error handling
-            echo "🚀 Pushing to remote..."
-            if git push; then
-              echo "✅ Push successful"
-            else
-              echo "❌ ERROR: Failed to push to remote"
-              exit 1
-            fi
-          else
-            echo "❌ ERROR: Failed to commit changes"
+          echo "📤 Committing with message: 'Auto-update processed CSV files [skip ci]'"
+          if ! git commit -m "Auto-update processed CSV files [skip ci]"; then
+            echo "❌ ERROR: Failed to create commit"
             exit 1
           fi
+          echo "✅ Commit created successfully"
+          echo ""
+          
+          # Push with error handling
+          echo "🚀 Pushing to remote repository..."
+          if ! git push; then
+            echo ""
+            echo "❌ ============================================"
+            echo "❌ ERROR: Failed to push to remote"
+            echo "❌ ============================================"
+            echo "💡 Possible causes:"
+            echo "   - Missing write permissions (check workflow permissions)"
+            echo "   - Branch protection rules blocking push"
+            echo "   - Network/authentication issues"
+            echo "❌ ============================================"
+            exit 1
+          fi
+          echo "✅ Push successful"
         fi
+        echo ""
+        echo "✅ ============================================"
+        echo "✅ Commit/Push step completed"
+        echo "✅ ============================================"
 
     # ========================================================================
-    # STEP 9: Final Summary & Cleanup
+    # STEP 9: Final Summary (Always Runs)
     # ========================================================================
     - name: 📊 Final Summary
       if: always()
@@ -326,28 +447,30 @@ jobs:
         
         if [ "${{ job.status }}" = "success" ]; then
           echo "✅ ✅ ✅ ALL STEPS COMPLETED SUCCESSFULLY ✅ ✅ ✅"
+          echo ""
+          echo "📁 Processed files available in:"
+          echo "   - GitHub: output/ folder"
+          echo "   - Artifacts: processing-logs-${{ github.run_number }}"
+          echo ""
+          echo "🚀 Next steps:"
+          echo "   - View processed CSVs in output/ folder"
+          echo "   - Download logs if needed for debugging"
+          echo "   - Push new CSV to input/ to trigger re-processing"
         else
           echo "❌ ❌ ❌ JOB FAILED - CHECK LOGS ABOVE ❌ ❌ ❌"
-          echo "📄 Download artifacts for detailed logs:"
-          echo "   - pytest-logs-${{ github.run_number }}"
-          echo "   - processing-logs-${{ github.run_number }}"
-          echo "   - install-error-log (if applicable)"
+          echo ""
+          echo "📄 Download these artifacts for debugging:"
+          echo "   - pytest-logs-${{ github.run_number }} (test failures)"
+          echo "   - processing-logs-${{ github.run_number }} (processing errors)"
+          echo "   - install-error-log (dependency issues)"
+          echo ""
+          echo "🔍 Quick debug checklist:"
+          echo "   1. Expand failed step in Actions UI to see logs"
+          echo "   2. Download artifact logs for full output"
+          echo "   3. Reproduce locally: python main.py"
+          echo "   4. Check imports match actual filenames"
+          echo "   5. Verify CSV files are valid UTF-8"
         fi
+        echo ""
         echo "🎉 ============================================"
         echo ""
-
-    # ========================================================================
-    # STEP 10: Notify on Failure (Optional - Requires Slack/Discord Setup)
-    # ========================================================================
-    # Uncomment and configure if you want failure notifications:
-    # - name: 🔔 Notify on Failure
-    #   if: failure()
-    #   run: |
-    #     echo "❌ CI Pipeline Failed!"
-    #     echo "Repository: ${{ github.repository }}"
-    #     echo "Commit: ${{ github.sha }}"
-    #     echo "Run URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-    #     # Add webhook call to Slack/Discord/Email here
-    #     # curl -X POST -H 'Content-type: application/json' \
-    #     #   --data "{\"text\":\"❌ CI Failed: ${{ github.repository }}\"}" \
-    #     #   ${{ secrets.SLACK_WEBHOOK }}
